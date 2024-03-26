@@ -1,0 +1,9 @@
+﻿services:
+  stackexchange.api:
+    image: stackexchange.api
+    build:
+      context: .
+      dockerfile: StackExchange.API/Dockerfile
+    ports:
+      - "8080:8080"
+      - "8081:8081"
