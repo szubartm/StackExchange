@@ -4,3 +4,7 @@ GET {{StackExchange.API_HostAddress}}/test/
 Accept: application/json
 
 ###
+
+GET {{StackExchange.API_HostAddress}}/thousand-tag
+
+###
