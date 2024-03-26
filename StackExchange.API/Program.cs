@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Configuration.AddUserSecrets<Program>();
 //builder.Services.AddScoped(hc => new StackExchangeClient("hBuHT5Zxe1PjfBdTGpt4iQ"));
 
 var app = builder.Build();
@@ -25,8 +26,8 @@ app.MapGet("/Test", async (ILogger<Program> logger, HttpResponse response) =>
     logger.LogInformation("Testing logging in Program.cs");
     await response.WriteAsync("Testing");
 }).WithName("Test").WithOpenApi();
-using ILoggerFactory factory = LoggerFactory.Create(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Information)); // Set to Information level
+using ILoggerFactory factory = LoggerFactory.Create(builder => builder.AddConsole());
 
-var client = new StackExchangeClient("hBuHT5Zxe1PjfBdTGpt4iQ((", factory.CreateLogger("StackExchangeClient"));
+var client = new StackExchangeClient(builder.Configuration["ApiKey"], factory.CreateLogger("StackExchangeClient"));
 app.MapGet("/thousand-tag", () => { return client.TagClient.GetThousandTags(new Filter()); });
 app.Run();
