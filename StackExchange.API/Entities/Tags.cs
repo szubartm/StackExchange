@@ -13,4 +13,5 @@ public class Tags
     [JsonProperty("count")] public long Count { get; set; }
 
     [JsonProperty("name")] public string Name { get; set; }
+    public decimal PercentageOfAllGivenTags { get; set; }
 }

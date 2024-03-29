@@ -4,5 +4,5 @@ namespace StackExchange.API.Interfaces;
 
 public interface ITagClient
 {
-    List<StackExchangeResponse<Tags>> GetThousandTags(Filter filter);
+    IEnumerable<StackExchangeResponse<Tags>> GetTags(Filter filter, int numberOfTags, int pageSize);
 }

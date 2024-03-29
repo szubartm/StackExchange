@@ -5,6 +5,9 @@ Accept: application/json
 
 ###
 
-GET {{StackExchange.API_HostAddress}}/thousand-tag
+GET {{StackExchange.API_HostAddress}}/tags?count=325
 
 ###
+GET {{StackExchange.API_HostAddress}}/tags?count=14&pageSize=1002
+
+###http://localhost:8080/tags?count=14&pageSize=1002

@@ -5,40 +5,57 @@ using StackExchange.API.Interfaces;
 
 namespace StackExchange.API.Clients;
 
-public partial class StackExchangeClient : ITagClient
+public class TagClient(IHttpClientFactory factory, ILogger<TagClient> logger) : ITagClient
 {
+    private const int MaxPageSize = 100;
     private static string _apiUrl;
-    private static int _page = 1;
-    private static readonly int _pageSize = 100;
 
-    public ITagClient TagClient => this;
-    //https://api.stackexchange.com/2.3/tags?order=desc&site=stackoverflow
-
-    List<StackExchangeResponse<Tags>> ITagClient.GetThousandTags(Filter filter)
+    public IEnumerable<StackExchangeResponse<Tags>> GetTags(Filter filter, int numberExpectedOfTags, int pageSize)
     {
-        HttpContent? content = null;
-        StackExchangeResponse<Tags>? response;
-        var list = new List<StackExchangeResponse<Tags>>();
-        var numberOfIterations = 1000 / _pageSize;
-        for (var i = 0; i < numberOfIterations; i++)
+        var client = factory.CreateClient("TagClient");
+        var responseList = new List<StackExchangeResponse<Tags>>();
+        int currentPageSize;
+        if (Validators.IsPageSizeValid(pageSize))
         {
-            _apiUrl = $"{_baseApiUrl}/tags?key={_apiKey}&page={_page}&site={filter.Site}&pagesize={_pageSize}";
+            currentPageSize = pageSize;
+        }
+        else
+        {
+            currentPageSize = MaxPageSize;
+            logger.LogWarning(
+                "Provided page size ({pageSize}) is not valid. Setting page size to the biggest possible ({MaxPageSize}).",
+                pageSize, MaxPageSize);
+        }
+
+        var numberOfCurrentTags = 0;
+        var page = 1;
+
+        while (numberExpectedOfTags > 0)
+        {
+            if (numberExpectedOfTags < currentPageSize) currentPageSize = numberExpectedOfTags;
+
+            _apiUrl =
+                $"{client.BaseAddress}&{numberExpectedOfTags}&page={page}&site={filter.Site}&pagesize={currentPageSize}";
 
             if (filter.Order is not null) _apiUrl += $"&order={filter.Order.ToString().ToLower()}";
 
-            content = _httpClient.GetAsync(_apiUrl).Result.Content;
-
-            response = JsonConvert.DeserializeObject<ResponseData<Tags>>(content.ReadAsStringAsync().Result)
+            var httpContent = client.GetAsync(_apiUrl).Result.Content;
+            var response = JsonConvert.DeserializeObject<ResponseData<Tags>>(httpContent.ReadAsStringAsync().Result)
                 .ValidateResponse();
+            responseList.Add(response);
 
-            if (response.ResponseData.HasMore) _page++;
+            numberExpectedOfTags -= currentPageSize;
 
-            list.Add(response);
+            if (response.ResponseData.HasMore)
+                page++;
+            else
+                break;
         }
 
-        //var response = _httpClient.GetAsync(_apiUrl).Result.Content.ReadFromJsonAsync<StackExchangeResponse<Tags>>().ValidateResponse();
-        var numberOfTags = list.Count * list.FirstOrDefault().ResponseData.Items.Length;
-        _logger.LogInformation("Number fo tags: {0}",args: numberOfTags);
-        return list;
+        numberOfCurrentTags = responseList.SelectMany(x => x.ResponseData.Items.Select(y => y.Name)).Count();
+        logger.LogInformation("Number of different tags fetched: {numberOfCurrentTags}", numberOfCurrentTags);
+        logger.LogInformation("Number of batches: {responseList}", responseList.Count);
+
+        return responseList;
     }
 }
