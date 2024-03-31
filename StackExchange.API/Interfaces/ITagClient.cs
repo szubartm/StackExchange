@@ -1,4 +1,5 @@
 ﻿using StackExchange.API.Entities;
+using StackExchange.API.Models.Api;
 
 namespace StackExchange.API.Interfaces;
 

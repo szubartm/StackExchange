@@ -2,6 +2,7 @@
 using StackExchange.API.Entities;
 using StackExchange.API.Helpers;
 using StackExchange.API.Interfaces;
+using StackExchange.API.Models.Api;
 
 namespace StackExchange.API.Clients;
 

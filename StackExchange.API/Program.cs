@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StackExchange.API.Clients;
+using StackExchange.API.Data.Contexts;
 using StackExchange.API.Entities;
 using StackExchange.API.Enums;
 using StackExchange.API.Interfaces;
@@ -16,6 +18,7 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    //app.ApplyMigrations();
 }
 
 app.UseHttpsRedirection();
@@ -27,14 +30,21 @@ app.MapGet("/Test", async (ILogger<Program> logger, HttpResponse response) =>
 }).WithName("Test").WithOpenApi();
 
 app.MapGet("/tags",
-    ([FromServices] ITagService tagService, [FromServices] ITagClient tagClient, int count = 2, int pagesize = 100) =>
+    async ([FromServices] ITagService tagService, [FromServices] ITagClient tagClient, int count = 2, int pagesize = 100) =>
     {
-        var result = tagClient.GetTags(new Filter(Order.Asc), count, pagesize);
+        var result = tagClient.GetTags(new Filter(Order.Desc), count, pagesize);
         tagService.SetPercentageOfAllGivenTags(result);
+        var test = result.Select(x => x.ResponseData).Select(y => y.Items).ToList();
+
+        await tagService.SaveAsync(test);
 
         return result;
     });
 
+app.MapGet("/result", ([FromServices] ITagService tagService) =>
+{
+    return tagService.GetTags();
+});
 app.Run();
 
 void Configure(WebApplicationBuilder webApplicationBuilder)
@@ -44,8 +54,6 @@ void Configure(WebApplicationBuilder webApplicationBuilder)
     webApplicationBuilder.Services.AddScoped<IPercentageCalculator, PercentageCalculator>();
     webApplicationBuilder.Services.AddScoped<ITagClient, TagClient>();
     webApplicationBuilder.Services.AddScoped<ITagService, TagService>();
-    webApplicationBuilder.Logging.AddConsole();
-    webApplicationBuilder.Configuration.AddUserSecrets<Program>();
     webApplicationBuilder.Services.AddHttpClient("TagClient", client =>
     {
         var apiKey = webApplicationBuilder.Configuration["ApiKey"];
@@ -61,4 +69,10 @@ void Configure(WebApplicationBuilder webApplicationBuilder)
         };
         return httpClientHandler;
     });
+    webApplicationBuilder.Services.AddDbContext<TagsDbContext>(options =>
+    {
+        options.UseNpgsql(webApplicationBuilder.Configuration["Database"]);
+    });
+    webApplicationBuilder.Logging.AddConsole();
+    webApplicationBuilder.Configuration.AddUserSecrets<Program>();
 }

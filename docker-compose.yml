@@ -7,3 +7,15 @@
     ports:
       - "8080:8080"
       - "8081:8081"
+  
+  stackexchange.database:
+    image: postgres:latest
+    container_name: stackexchange.database
+    environment:
+      - POSTGRES_DB=tag
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ./.containers/stackexchange-db:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
