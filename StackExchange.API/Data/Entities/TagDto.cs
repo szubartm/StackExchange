@@ -1,7 +1,10 @@
-﻿using StackExchange.API.Models.Api;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
+using StackExchange.API.Models.Api;
 
 namespace StackExchange.API.Data.Entities;
 
+[Table("tags")]
 public class TagDto
 {
     public int Id { get; set; }
@@ -11,7 +14,7 @@ public class TagDto
     public bool IsRequired { get; set; }
     public long Count { get; set; }
 
-    public decimal PercentageOfAllGivenTags { get; set; }
+    [Column(TypeName = "decimal(6, 4)")] public decimal PercentageOfAllGivenTags { get; set; }
 
 
     public static implicit operator TagDto(Tags tag)

@@ -44,6 +44,7 @@ public class TagClient(IHttpClientFactory factory, ILogger<TagClient> logger) : 
             var response = JsonConvert.DeserializeObject<ResponseData<Tags>>(httpContent.ReadAsStringAsync().Result)
                 .ValidateResponse();
             responseList.Add(response);
+            
 
             numberExpectedOfTags -= currentPageSize;
 

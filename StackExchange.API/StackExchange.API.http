@@ -5,12 +5,13 @@ Accept: application/json
 
 ###
 
-GET {{StackExchange.API_HostAddress}}/tags?count=325
+GET {{StackExchange.API_HostAddress}}/populatedatabase?count=10
 
 ###
-GET {{StackExchange.API_HostAddress}}/tags?count=40&pageSize=100
+GET {{StackExchange.API_HostAddress}}/populatedatabase?count=15&pagesize=100
 
 ###
 GET {{StackExchange.API_HostAddress}}/result
+
 ###
 ###http://localhost:8080/tags?count=14&pageSize=1002

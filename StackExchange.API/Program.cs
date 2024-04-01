@@ -1,11 +1,16 @@
 using System.Net;
+using HealthChecks.UI.Client;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.API.Clients;
 using StackExchange.API.Data.Contexts;
+using StackExchange.API.Data.Entities;
+using StackExchange.API.Data.ExtensionMethods;
 using StackExchange.API.Entities;
 using StackExchange.API.Enums;
 using StackExchange.API.Interfaces;
+using StackExchange.API.Repositories;
 using StackExchange.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,42 +26,82 @@ if (app.Environment.IsDevelopment())
     //app.ApplyMigrations();
 }
 
+app.UseHttpLogging();
 app.UseHttpsRedirection();
+app.ApplyMigrations();
 
-app.MapGet("/Test", async (ILogger<Program> logger, HttpResponse response) =>
+app.MapHealthChecks("_health", new HealthCheckOptions
 {
-    logger.LogInformation("Testing logging in Program.cs");
-    await response.WriteAsync("Testing");
-}).WithName("Test").WithOpenApi();
-
-app.MapGet("/tags",
-    async ([FromServices] ITagService tagService, [FromServices] ITagClient tagClient, int count = 2, int pagesize = 100) =>
-    {
-        var result = tagClient.GetTags(new Filter(Order.Desc), count, pagesize);
-        tagService.SetPercentageOfAllGivenTags(result);
-        var test = result.Select(x => x.ResponseData).Select(y => y.Items).ToList();
-
-        await tagService.SaveAsync(test);
-
-        return result;
-    });
-
-app.MapGet("/result", ([FromServices] ITagService tagService) =>
-{
-    return tagService.GetTags();
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
 });
+
+app.MapGet("/populate-database",
+        async ([FromServices] ITagService tagService, [FromServices] ITagClient tagClient,
+            [FromServices] ITagRepository tagRepository, int count = 1000,
+            int pagesize = 100) =>
+        {
+            try
+            {
+                var result = tagClient.GetTags(new Filter(Order.Desc), count, pagesize);
+                var tags = result.Select(x => x.ResponseData).Select(y => y.Items).ToList();
+                
+                await tagRepository.AddTags(tags);
+            }
+            catch (Exception exception)
+            {
+                throw new Exception(exception.Message);
+            }
+        }).WithTags("Fetch from official StackExchangeAPI")
+    .WithDescription("Use to populate/refresh local db. Every call truncates table 'tags' in database.").WithOpenApi();
+
+app.MapGet("/api/tags", async ([FromServices] ITagRepository tagRepository) =>
+{
+    var tags = await tagRepository.GetTags();
+    return tags.Any()
+        ? Results.Ok(tags.OrderBy(x=>x.Id))
+        : Results.NotFound();
+}).WithTags("From database");
+
+
+app.MapGet("/api/tags/{id:int}", async ([FromServices] ITagRepository tagRepository, int id) =>
+await tagRepository.GetTag(id)
+    is TagDto tag
+    ? Results.Ok(tag)
+    : Results.NotFound()).WithTags("From database");
+
+app.MapPut("/api/tags/", async ([FromBody] TagDto tag, [FromServices] ITagRepository tagRepository) =>
+{
+    await tagRepository.UpdateTag(tag);
+
+    return Results.NoContent();
+}).WithTags("From database");
+
+app.MapDelete("/api/tags/{id:int}", async ([FromServices] ITagRepository tagRepository, int id) =>
+{
+    await tagRepository.DeleteTagById(id);
+
+    return Results.NoContent();
+}).WithTags("From database");
+
+app.MapDelete("/api/tags/{name}", async ([FromServices] ITagRepository tagRepository, string name) =>
+{
+    await tagRepository.DeleteTagByName(name);
+
+    return Results.NoContent();
+}).WithTags("From database");
 app.Run();
 
-void Configure(WebApplicationBuilder webApplicationBuilder)
+void Configure(WebApplicationBuilder builder)
 {
-    webApplicationBuilder.Services.AddEndpointsApiExplorer();
-    webApplicationBuilder.Services.AddSwaggerGen();
-    webApplicationBuilder.Services.AddScoped<IPercentageCalculator, PercentageCalculator>();
-    webApplicationBuilder.Services.AddScoped<ITagClient, TagClient>();
-    webApplicationBuilder.Services.AddScoped<ITagService, TagService>();
-    webApplicationBuilder.Services.AddHttpClient("TagClient", client =>
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+    builder.Services.AddScoped<IPercentageCalculator, PercentageCalculator>();
+    builder.Services.AddScoped<ITagClient, TagClient>();
+    builder.Services.AddScoped<ITagService, TagService>();
+    builder.Services.AddScoped<ITagRepository, TagRepository>();
+    builder.Services.AddHttpClient("TagClient", client =>
     {
-        var apiKey = webApplicationBuilder.Configuration["ApiKey"];
+        var apiKey = builder.Configuration["ApiKey"];
         if (apiKey is null)
             throw new ArgumentNullException();
 
@@ -69,10 +114,11 @@ void Configure(WebApplicationBuilder webApplicationBuilder)
         };
         return httpClientHandler;
     });
-    webApplicationBuilder.Services.AddDbContext<TagsDbContext>(options =>
-    {
-        options.UseNpgsql(webApplicationBuilder.Configuration["Database"]);
-    });
-    webApplicationBuilder.Logging.AddConsole();
-    webApplicationBuilder.Configuration.AddUserSecrets<Program>();
+    builder.Services.AddHttpLogging(log => log.CombineLogs = true);
+    builder.Services.AddDbContext<TagsDbContext>(options => { options.UseNpgsql(builder.Configuration["Database"]); });
+    builder.Logging.AddConsole();
+    builder.Configuration.AddUserSecrets<Program>();
+    builder.Services.AddHealthChecks()
+        .AddNpgSql(builder.Configuration["Database"])
+        .AddDbContextCheck<TagsDbContext>();
 }
