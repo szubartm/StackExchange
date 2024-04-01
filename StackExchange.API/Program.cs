@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
@@ -7,9 +8,7 @@ using StackExchange.API.Clients;
 using StackExchange.API.Data.Contexts;
 using StackExchange.API.Data.Entities;
 using StackExchange.API.Data.ExtensionMethods;
-using StackExchange.API.Entities;
-using StackExchange.API.Enums;
-using StackExchange.API.Interfaces;
+using StackExchange.API.Helpers;
 using StackExchange.API.Repositories;
 using StackExchange.API.Services;
 
@@ -36,29 +35,43 @@ app.MapHealthChecks("_health", new HealthCheckOptions
 });
 
 app.MapGet("/populate-database",
-        async ([FromServices] ITagService tagService, [FromServices] ITagClient tagClient,
-            [FromServices] ITagRepository tagRepository, int count = 1000,
-            int pagesize = 100) =>
+        async ([FromServices] ITagClient tagClient,
+            [FromServices] ITagRepository tagRepository, [AsParameters] StackExchangeQueryObject query) =>
         {
             try
             {
-                var result = tagClient.GetTags(new Filter(Order.Desc), count, pagesize);
-                var tags = result.Select(x => x.ResponseData).Select(y => y.Items).ToList();
-                
+                var response = tagClient.GetTags(query);
+                var result = response.Where(x => x.ErrorId is not null).FirstOrDefault();
+
+                if (result is not null)
+                {
+                    var errorContent =
+                        $"Error Id: {result.ErrorId}, Error name: {result.ErrorName}, Error message: {result.ErrorMessage}";
+                    return Results.Content(errorContent, "text/plain", Encoding.Default,
+                        StatusCodes.Status400BadRequest);
+                }
+
+                var tags = response.Select(x => x.Items).ToList();
                 await tagRepository.AddTags(tags);
+
+                return Results.Ok();
             }
             catch (Exception exception)
             {
                 throw new Exception(exception.Message);
             }
         }).WithTags("Fetch from official StackExchangeAPI")
-    .WithDescription("Use to populate/refresh local db. Every call truncates table 'tags' in database.").WithOpenApi();
+    .WithDescription(
+        @"Use to populate/refresh local db. Every call truncates table 'tags' in database. Returns the tags found on a site. 
+        This method returns a list of tags. The sorts accepted by this method operate on the following fields of the tag object: popular – count | activity – the creation_date of the last question asked with the tag 
+        name – name popular is the default sort.")
+    .WithOpenApi();
 
-app.MapGet("/api/tags", async ([FromServices] ITagRepository tagRepository) =>
+app.MapGet("/api/tags", async ([AsParameters] DbQueryObject query, [FromServices] ITagRepository tagRepository) =>
 {
-    var tags = await tagRepository.GetTags();
+    var tags = await tagRepository.GetTags(query);
     return tags.Any()
-        ? Results.Ok(tags.OrderBy(x=>x.Id))
+        ? Results.Ok(tags)
         : Results.NotFound();
 }).WithTags("From database");
 

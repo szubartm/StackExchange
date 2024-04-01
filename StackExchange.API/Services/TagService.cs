@@ -10,6 +10,6 @@ public class TagService(IPercentageCalculator calculator, ILogger<TagService> lo
         var tagsCount = tags.Sum(tag => tag.Count);
 
         foreach (var tag in tags)
-            tag.PercentageOfAllGivenTags = calculator.CalculatePercentageShareInTagCollection(tag.Count, tagsCount);
+            tag.Share = calculator.CalculatePercentageShareInTagCollection(tag.Count, tagsCount);
     }
 }

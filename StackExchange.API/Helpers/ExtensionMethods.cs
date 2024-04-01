@@ -19,11 +19,9 @@ internal static class ExtensionMethods
         }
         catch (Exception ex)
         {
-            result.Exception = ex;
             result.Success = false;
         }
 
         return result;
     }
-    
 }

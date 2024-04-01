@@ -1,18 +1,39 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using StackExchange.API.Data.Contexts;
 using StackExchange.API.Data.Entities;
+using StackExchange.API.Helpers;
 using StackExchange.API.Models.Api;
 using StackExchange.API.Services;
 
 namespace StackExchange.API.Repositories;
 
-public class TagRepository(TagsDbContext context, ITagService tagService) : ITagRepository
+public class TagRepository(TagsDbContext context, ITagService tagService, ILogger<TagRepository> logger)
+    : ITagRepository
 {
-    private readonly TagsDbContext _context = context;
-
-    public async Task<IEnumerable<TagDto>> GetTags()
+    public async Task<IEnumerable<TagDto>> GetTags(DbQueryObject dbQuery)
     {
-        return await _context.Tags.ToListAsync();
+        var tags = context.Tags.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(dbQuery.SortBy))
+        {
+            if (dbQuery.SortBy.Equals("name", StringComparison.OrdinalIgnoreCase))
+                tags = dbQuery.Order.Equals("desc", StringComparison.OrdinalIgnoreCase)
+                    ? tags.OrderByDescending(tag => tag.Name)
+                    : tags.OrderBy(tag => tag.Name);
+
+            if (dbQuery.SortBy.Equals("share", StringComparison.OrdinalIgnoreCase))
+                tags = dbQuery.Order.Equals("desc", StringComparison.OrdinalIgnoreCase)
+                    ? tags.OrderByDescending(tag => tag.Share)
+                    : tags.OrderBy(tag => tag.Share);
+        }
+
+        if (dbQuery.PageNumber <= 0)
+        {
+            logger.LogWarning("Invalid page number. Was {query.PageNumber}, setting to: 1", dbQuery.PageNumber);
+            dbQuery.PageNumber = 1;
+        }
+
+        return await tags.Skip((dbQuery.PageNumber - 1) * dbQuery.PageSize).Take(dbQuery.PageSize).ToListAsync();
     }
 
     public async Task<TagDto> GetTag(int id)
@@ -39,9 +60,10 @@ public class TagRepository(TagsDbContext context, ITagService tagService) : ITag
         await context.Tags.AddRangeAsync(tagDtosList);
         await context.SaveChangesAsync();
         await context.UpdatePercentageColumn();
+        logger.LogInformation("Fetched tags: {count}", tagDtosList.Count);
     }
 
- 
+
     public async Task UpdateTag(TagDto tag)
     {
         var tagToUpdate = await context.Tags.FindAsync(tag.Id);
@@ -66,7 +88,7 @@ public class TagRepository(TagsDbContext context, ITagService tagService) : ITag
 
     public async Task DeleteTagByName(string name)
     {
-        var tagToDelete = context.Tags.FirstOrDefaultAsync(x => x.Name == name).Result;
+        var tagToDelete = await context.Tags.FindAsync(name);
         if (tagToDelete is not null)
         {
             context.Tags.Remove(tagToDelete);

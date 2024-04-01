@@ -45,12 +45,12 @@ namespace StackExchange.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<decimal>("PercentageOfAllGivenTags")
+                    b.Property<decimal>("Share")
                         .HasColumnType("decimal(6, 4)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("tags", (string)null);
+                    b.ToTable("tags");
                 });
 #pragma warning restore 612, 618
         }

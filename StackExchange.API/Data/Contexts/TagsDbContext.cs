@@ -18,5 +18,4 @@ public class TagsDbContext(DbContextOptions<TagsDbContext> options, ITagService 
         tagService.SetPercentageOfAllGivenTags(await Tags.ToListAsync());
         await SaveChangesAsync();
     }
-    
 }
