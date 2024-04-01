@@ -29,8 +29,14 @@ public class TagRepository(TagsDbContext context, ITagService tagService, ILogge
 
         if (dbQuery.PageNumber <= 0)
         {
-            logger.LogWarning("Invalid page number. Was {query.PageNumber}, setting to: 1", dbQuery.PageNumber);
+            logger.LogWarning("Invalid page number. Was {PageNumber}, setting to: 1", dbQuery.PageNumber);
             dbQuery.PageNumber = 1;
+        }
+
+        if (dbQuery.PageSize < 0)
+        {
+            logger.LogWarning("Invalid page size. Was {pagesize}, setting to: 25", dbQuery.PageSize);
+            dbQuery.PageSize = 25;
         }
 
         return await tags.Skip((dbQuery.PageNumber - 1) * dbQuery.PageSize).Take(dbQuery.PageSize).ToListAsync();
@@ -67,6 +73,7 @@ public class TagRepository(TagsDbContext context, ITagService tagService, ILogge
     public async Task UpdateTag(TagDto tag)
     {
         var tagToUpdate = await context.Tags.FindAsync(tag.Id);
+
         if (tagToUpdate is not null)
         {
             context.Entry(tagToUpdate).State = EntityState.Detached;
@@ -78,21 +85,11 @@ public class TagRepository(TagsDbContext context, ITagService tagService, ILogge
 
     public async Task DeleteTagById(int id)
     {
-        var tagToDelete = context.Tags.FirstOrDefaultAsync(x => x.Id == id).Result;
-        if (tagToDelete is not null)
-        {
-            context.Tags.Remove(tagToDelete);
-            await context.SaveChangesAsync();
-        }
+        await context.Tags.Where(x => x.Id == id).ExecuteDeleteAsync();
     }
 
     public async Task DeleteTagByName(string name)
     {
-        var tagToDelete = await context.Tags.FindAsync(name);
-        if (tagToDelete is not null)
-        {
-            context.Tags.Remove(tagToDelete);
-            await context.SaveChangesAsync();
-        }
+        await context.Tags.Where(x => x.Name.Equals(name)).ExecuteDeleteAsync();
     }
 }

@@ -2,7 +2,7 @@
 
 namespace StackExchange.API.Services;
 
-public class TagService(IPercentageCalculator calculator, ILogger<TagService> logger)
+public class TagService(IPercentageCalculator calculator)
     : ITagService
 {
     public void SetPercentageOfAllGivenTags(List<TagDto> tags)
