@@ -1,4 +1,4 @@
-﻿namespace StackExchange.API.Entities;
+﻿namespace StackExchange.API.Models.Api;
 
 public class StackExchangeResponse<T>
 {

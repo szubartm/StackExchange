@@ -4,6 +4,7 @@ using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.API;
 using StackExchange.API.Clients;
 using StackExchange.API.Data.Contexts;
 using StackExchange.API.Data.Entities;
@@ -67,41 +68,7 @@ app.MapGet("/populate-database",
         name – name popular is the default sort.")
     .WithOpenApi();
 
-app.MapGet("/api/tags", async ([AsParameters] DbQueryObject query, [FromServices] ITagRepository tagRepository) =>
-{
-    var tags = await tagRepository.GetTags(query);
-    return tags.Any()
-        ? Results.Ok(tags)
-        : Results.NotFound();
-}).WithTags("From database");
-
-
-app.MapGet("/api/tags/{id:int}", async ([FromServices] ITagRepository tagRepository, int id) =>
-await tagRepository.GetTag(id)
-    is TagDto tag
-    ? Results.Ok(tag)
-    : Results.NotFound()).WithTags("From database");
-
-app.MapPut("/api/tags/", async ([FromBody] TagDto tag, [FromServices] ITagRepository tagRepository) =>
-{
-    await tagRepository.UpdateTag(tag);
-
-    return Results.NoContent();
-}).WithTags("From database");
-
-app.MapDelete("/api/tags/{id:int}", async ([FromServices] ITagRepository tagRepository, int id) =>
-{
-    await tagRepository.DeleteTagById(id);
-
-    return Results.NoContent();
-}).WithTags("From database");
-
-app.MapDelete("/api/tags/{name}", async ([FromServices] ITagRepository tagRepository, string name) =>
-{
-    await tagRepository.DeleteTagByName(name);
-
-    return Results.NoContent();
-}).WithTags("From database");
+app.MapGroup("/api/tags").RegisterTagEndpoints().WithTags("Database");
 app.Run();
 
 void Configure(WebApplicationBuilder builder)
@@ -134,4 +101,8 @@ void Configure(WebApplicationBuilder builder)
     builder.Services.AddHealthChecks()
         .AddNpgSql(builder.Configuration["Database"])
         .AddDbContextCheck<TagsDbContext>();
+}
+
+public partial class Program
+{
 }

@@ -32,4 +32,8 @@
         </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Remove="Models.Api\Filter.cs" />
+    </ItemGroup>
+
 </Project>

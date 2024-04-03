@@ -1,5 +1,5 @@
 ﻿using StackExchange.API.CustomExceptions;
-using StackExchange.API.Entities;
+using StackExchange.API.Models.Api;
 
 namespace StackExchange.API.Helpers;
 

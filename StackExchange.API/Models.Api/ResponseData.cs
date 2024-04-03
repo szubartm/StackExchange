@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 
-namespace StackExchange.API.Entities;
+namespace StackExchange.API.Models.Api;
 
 public class ResponseData<T>
 {
