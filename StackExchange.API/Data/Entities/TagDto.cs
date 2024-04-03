@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
-using StackExchange.API.Models.Api;
+using StackExchange.API.ExternalApi.Models;
 
 namespace StackExchange.API.Data.Entities;
 

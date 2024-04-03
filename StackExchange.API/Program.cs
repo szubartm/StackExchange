@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.API;
 using StackExchange.API.Clients;
 using StackExchange.API.Data.Contexts;
-using StackExchange.API.Data.Entities;
 using StackExchange.API.Data.ExtensionMethods;
 using StackExchange.API.Helpers;
 using StackExchange.API.Repositories;
@@ -75,7 +74,7 @@ void Configure(WebApplicationBuilder builder)
 {
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
-    builder.Services.AddScoped<IPercentageCalculator, PercentageCalculator>();
+    builder.Services.AddScoped<ICalculator, CountShareCalculator>();
     builder.Services.AddScoped<ITagClient, TagClient>();
     builder.Services.AddScoped<ITagService, TagService>();
     builder.Services.AddScoped<ITagRepository, TagRepository>();
@@ -102,6 +101,7 @@ void Configure(WebApplicationBuilder builder)
         .AddNpgSql(builder.Configuration["Database"])
         .AddDbContextCheck<TagsDbContext>();
 }
+
 
 public partial class Program
 {

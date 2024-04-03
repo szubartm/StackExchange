@@ -1,5 +1,5 @@
-﻿using StackExchange.API.Helpers;
-using StackExchange.API.Models.Api;
+﻿using StackExchange.API.ExternalApi.Models;
+using StackExchange.API.Helpers;
 
 namespace StackExchange.API.Clients;
 

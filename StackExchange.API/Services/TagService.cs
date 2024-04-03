@@ -2,14 +2,18 @@
 
 namespace StackExchange.API.Services;
 
-public class TagService(IPercentageCalculator calculator)
+public class TagService(ICalculator calculator)
     : ITagService
 {
-    public void SetPercentageOfAllGivenTags(List<TagDto> tags)
+    public List<TagDto> SetPercentageOfAllGivenTags(List<TagDto> tags)
     {
+        if (tags.Count == 0) return tags;
+
         var tagsCount = tags.Sum(tag => tag.Count);
 
         foreach (var tag in tags)
-            tag.Share = calculator.CalculatePercentageShareInTagCollection(tag.Count, tagsCount);
+            tag.Share = calculator.CalculatePercentage(tag.Count, tagsCount);
+
+        return tags;
     }
 }

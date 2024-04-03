@@ -1,4 +1,4 @@
-﻿namespace StackExchange.API.Models.Api;
+﻿namespace StackExchange.API.ExternalApi.Models;
 
 public class StackExchangeResponse<T>
 {

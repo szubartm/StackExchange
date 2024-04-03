@@ -1,16 +1,18 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
 using StackExchange.API.Data.Contexts;
 using StackExchange.API.Data.Entities;
+using StackExchange.API.Data.Models;
+using StackExchange.API.ExternalApi.Models;
 using StackExchange.API.Helpers;
-using StackExchange.API.Models.Api;
 using StackExchange.API.Services;
 
 namespace StackExchange.API.Repositories;
 
-public class TagRepository(TagsDbContext context, ITagService tagService, ILogger<TagRepository> logger)
+public class TagRepository(TagsDbContext context, ITagService service, ILogger<TagRepository> logger)
     : ITagRepository
 {
-    public async Task<IEnumerable<TagDto>> GetTags(DbQueryObject dbQuery)
+    public async Task<IResponseDataModel<IEnumerable<TagDto>>> GetTags(DbQueryObject dbQuery)
     {
         var tags = context.Tags.AsQueryable();
 
@@ -39,57 +41,155 @@ public class TagRepository(TagsDbContext context, ITagService tagService, ILogge
             dbQuery.PageSize = 25;
         }
 
-        return await tags.Skip((dbQuery.PageNumber - 1) * dbQuery.PageSize).Take(dbQuery.PageSize).ToListAsync();
+        var data = await tags.Skip((dbQuery.PageNumber - 1) * dbQuery.PageSize).Take(dbQuery.PageSize).ToListAsync();
+        return data.Count > 0
+            ? new ResponseDataModel<IEnumerable<TagDto>>
+            {
+                Success = true,
+                Data = data
+            }
+            : new ResponseDataModel<IEnumerable<TagDto>>
+            {
+                Success = false,
+                Message = "Tags not found"
+            };
     }
 
-    public async Task<TagDto> GetTag(int id)
+
+    public async Task<IResponseDataModel<TagDto>> UpdateTag(TagDto tag)
     {
-        return await context.Tags.FindAsync(id);
+        var dataToUpdate = await GetTag(x => x.Id.Equals(tag.Id));
+        ;
+        if (!dataToUpdate.Success)
+            return new ResponseDataModel<TagDto> { Success = false, Message = dataToUpdate.Message };
+
+        context.Entry(dataToUpdate.Data).State = EntityState.Detached;
+        dataToUpdate.Data = tag;
+        context.Update(dataToUpdate.Data);
+
+        if (await context.SaveChangesAsync() != 1)
+            return new ResponseDataModel<TagDto>
+            {
+                Success = false
+            };
+        var test = context.Tags;
+
+
+        service.SetPercentageOfAllGivenTags(context.Tags.ToList());
+        await context.SaveChangesAsync();
+
+        return new ResponseDataModel<TagDto>
+        {
+            Success = true,
+            Data = dataToUpdate.Data
+        };
     }
 
-    public async Task AddTags(List<Tags[]> tagsList)
+    public async Task<IResponseModel> DeleteTagById(int id)
     {
+        var data = await GetTag(x => x.Id.Equals(id));
+        if (!data.Success) return new ResponseModel { Success = false, Message = data.Message };
+        context.Tags.Remove(data.Data);
+        return await context.SaveChangesAsync() == 1
+            ? new ResponseModel { Success = true }
+            : new ResponseModel
+            {
+                Success = false
+            };
+    }
+
+    public async Task<IResponseModel> DeleteTagByName(string name)
+    {
+        var data = await GetTag(x => x.Name.Equals(name));
+        if (!data.Success) return new ResponseModel { Success = false, Message = data.Message };
+        context.Tags.Remove(data.Data);
+        return await context.SaveChangesAsync() == 1
+            ? new ResponseModel { Success = true }
+            : new ResponseModel
+            {
+                Success = false
+            };
+    }
+
+    public async Task<IResponseDataModel<IEnumerable<TagDto>>> AddTags(List<Tags[]> tagsList)
+    {
+        if (tagsList.Count == 0)
+            return new ResponseDataModel<IEnumerable<TagDto>>
+            {
+                Success = false,
+                Data = new List<TagDto>()
+            };
+
         var tagDto = new TagDto();
-        var tagDtosList = new List<TagDto>();
+        var data = new List<TagDto>();
         foreach (var tags in tagsList)
         foreach (var tag in tags)
         {
             tagDto = tag;
-            tagDtosList.Add(tagDto);
+            data.Add(tagDto);
         }
 
-        //var missingTags = tagDtosList.Where(x => !dbContext.Tags.Any(z => z.Name == x.Name)).ToList();
-
-        //if (missingTags.Count == 0) return;
-        //tagService.SetPercentageOfAllGivenTags(tagDtosList);
         await context.Truncate();
-        await context.Tags.AddRangeAsync(tagDtosList);
+        await context.Tags.AddRangeAsync(data);
+        if (await context.SaveChangesAsync() == 0)
+            return new ResponseDataModel<IEnumerable<TagDto>>
+            {
+                Success = false,
+                Data = new List<TagDto>()
+            };
+
+        service.SetPercentageOfAllGivenTags(context.Tags.ToList());
         await context.SaveChangesAsync();
-        await context.UpdatePercentageColumn();
-        logger.LogInformation("Fetched tags: {count}", tagDtosList.Count);
-    }
-
-
-    public async Task UpdateTag(TagDto tag)
-    {
-        var tagToUpdate = await context.Tags.FindAsync(tag.Id);
-
-        if (tagToUpdate is not null)
+        logger.LogInformation("Fetched tags: {count}", data.Count);
+        return new ResponseDataModel<IEnumerable<TagDto>>
         {
-            context.Entry(tagToUpdate).State = EntityState.Detached;
-            tagToUpdate = tag;
-            context.Update(tagToUpdate);
-            await context.UpdatePercentageColumn();
-        }
+            Success = true,
+            Data = data
+        };
     }
 
-    public async Task DeleteTagById(int id)
+    public async Task<IResponseDataModel<TagDto>> GetTag(Expression<Func<TagDto, bool>> filter)
     {
-        await context.Tags.Where(x => x.Id == id).ExecuteDeleteAsync();
+        var data = await context.Tags.SingleOrDefaultAsync(filter);
+        return data != null
+            ? new ResponseDataModel<TagDto>
+            {
+                Success = true,
+                Data = data
+            }
+            : new ResponseDataModel<TagDto>
+            {
+                Success = false,
+                Message = "Tag not found"
+            };
     }
 
-    public async Task DeleteTagByName(string name)
+    public async Task<IResponseDataModel<IEnumerable<TagDto>>> CreateTagsAsync(List<TagDto> tagsList)
     {
-        await context.Tags.Where(x => x.Name.Equals(name)).ExecuteDeleteAsync();
+        await context.Tags.AddRangeAsync(tagsList);
+        if (await context.SaveChangesAsync() == 0)
+            return new ResponseDataModel<IEnumerable<TagDto>>
+            {
+                Success = false,
+                Data = new List<TagDto>()
+            };
+
+        service.SetPercentageOfAllGivenTags(context.Tags.ToList());
+        await context.SaveChangesAsync();
+        logger.LogInformation("Added tags: {count}", tagsList.Count);
+        return new ResponseDataModel<IEnumerable<TagDto>>
+        {
+            Success = true,
+            Data = tagsList
+        };
+    }
+
+    public async Task<IResponseDataModel<IEnumerable<TagDto>>> ListAllTagsAsync()
+    {
+        return new ResponseDataModel<IEnumerable<TagDto>>
+        {
+            Success = true,
+            Data = await context.Tags.ToListAsync()
+        };
     }
 }

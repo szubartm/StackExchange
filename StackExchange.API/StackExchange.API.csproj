@@ -33,7 +33,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Remove="Models.Api\Filter.cs" />
+        <Compile Remove="Models.Api\Filter.cs"/>
     </ItemGroup>
 
 </Project>
